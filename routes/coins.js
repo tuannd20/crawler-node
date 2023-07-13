@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const fs = require('fs');
 const jsdom = require('jsdom');
 const router = express.Router();
 const { JSDOM } = jsdom;
@@ -98,6 +99,68 @@ router.get('/', async function (req, res, next) {
       features: keyFeatures,
     };
     res.json({ data: result });
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+router.get('/list', async function (req, res, next) {
+  try {
+    const configURL = {
+      method: 'get',
+      url: 'https://en.numista.com/catalogue/toutes_pieces.php?ct=coin',
+      headers: {
+        authority: 'en.numista.com',
+        accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'accept-language': 'en,vi-VN;q=0.9,vi;q=0.8,en-US;q=0.7',
+        'cache-control': 'max-age=0',
+        cookie:
+          '_pk_id.10.0242=62cc5b1518e355f3.1689129966.; PHPSESSID=5a2pbf27a7qtkkp9c33jp3fpnp; _pk_ses.10.0242=1; PHPSESSID=vhr5o39lu4ds3jqaar47tijkk9',
+        'sec-ch-ua':
+          '"Not.A/Brand";v="8", "Chromium";v="114", "Google Chrome";v="114"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-site': 'none',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+        'user-agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+      },
+    };
+    const response = await axios(configURL);
+    const dom = new JSDOM(response.data);
+    const document = dom.window.document;
+
+    const detailsElements = document.querySelectorAll('details.all_coins');
+
+    const coinList = [];
+    detailsElements.forEach((detailsElement) => {
+      const summaryText = detailsElement
+        .querySelector('summary')
+        .textContent.trim();
+      const coins = [];
+      const coinElements = detailsElement.querySelectorAll('a');
+      coinElements.forEach((coinElement) => {
+        const coinTextContent = coinElement.textContent.trim();
+        coins.push({ coinName: coinTextContent });
+      });
+
+      const coinDetail = {
+        country_region: summaryText,
+        coins: coins,
+      };
+      coinList.push(coinDetail);
+    });
+    const data = JSON.stringify(coinList);
+    fs.writeFileSync('coins.json', data, (err) => {
+      if (err) throw err;
+      console.log('Data written to file');
+    });
+
+    res.send('Oke');
   } catch (error) {
     console.log(error);
   }
