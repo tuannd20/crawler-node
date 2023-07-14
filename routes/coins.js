@@ -145,15 +145,24 @@ router.get('/list', async function (req, res, next) {
       const coinElements = detailsElement.querySelectorAll('a');
       coinElements.forEach((coinElement) => {
         const coinTextContent = coinElement.textContent.trim();
-        coins.push({ coinName: coinTextContent });
+        const coinDetailURL = coinElement.getAttribute('href');
+        coins.push({
+          title: coinTextContent + suffixTextCoin,
+          detail: `https://en.numista.com/catalogue/${coinDetailURL}`,
+        });
       });
 
       const coinDetail = {
-        country_region: summaryText,
-        coins: coins,
+        listCoins: coins,
       };
+      coinDetail.listCoins.forEach((coin) => {
+        coin.country_region = summaryText;
+      });
+      console.log(coinDetail);
       coinList.push(coinDetail);
     });
+
+    // console.log(coinList);
     const data = JSON.stringify(coinList);
     fs.writeFileSync('coins.json', data, (err) => {
       if (err) throw err;
