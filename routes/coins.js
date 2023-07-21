@@ -1,9 +1,11 @@
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
+const path = require('path');
 const jsdom = require('jsdom');
 const router = express.Router();
 const { JSDOM } = jsdom;
+const CoinDetailService = require('../services/coinDetail');
 
 router.get('/', async function (req, res, next) {
   try {
@@ -31,77 +33,97 @@ router.get('/', async function (req, res, next) {
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
       },
     };
-    const response = await axios(configURL);
-    const dom = new JSDOM(response.data);
-    const document = dom.window.document;
+    const crawlCoinDetail = await CoinDetailService.crawlCoinDetail(configURL);
+    res.json(crawlCoinDetail);
+    // const response = await axios(configURL);
+    // const dom = new JSDOM(response.data);
+    // const document = dom.window.document;
 
-    const mainTitleElement = document.querySelector('#main_title');
-    const h1Element = mainTitleElement.querySelector('h1');
-    let textContent = '';
-    for (const node of h1Element.childNodes) {
-      if (node.nodeName !== 'SPAN') {
-        textContent += node.textContent;
-      }
-    }
-    const subTitle = mainTitleElement.querySelector('span');
-    const tittle = {
-      mainTitle: textContent,
-      subTitle: subTitle.textContent,
-    };
+    // const mainTitleElement = document.querySelector('#main_title');
+    // const h1Element = mainTitleElement.querySelector('h1');
+    // let textContent = '';
+    // for (const node of h1Element.childNodes) {
+    //   if (node.nodeName !== 'SPAN') {
+    //     textContent += node.textContent;
+    //   }
+    // }
+    // const subTitle = mainTitleElement.querySelector('span');
+    // const tittle = {
+    //   mainTitle: textContent,
+    //   subTitle: subTitle.textContent,
+    // };
 
-    const imagesElement = document.querySelector('#fiche_photo');
-    const coinsImageElement = imagesElement.querySelectorAll('a img');
-    const imageUrl = [];
-    coinsImageElement.forEach((item) => {
-      imageUrl.push(item.getAttribute('src'));
-    });
-    const bank = imagesElement.querySelector('.mentions');
-    const bankURL = bank.querySelector('a').getAttribute('href');
-    const images = {
-      url: imageUrl,
-      bank: {
-        name: bank.textContent,
-        bankURL: bankURL,
-      },
-    };
+    // const imagesElement = document.querySelector('#fiche_photo');
+    // const coinsImageElement = imagesElement.querySelectorAll('a img');
+    // const imageUrl = [];
+    // coinsImageElement.forEach((item) => {
+    //   imageUrl.push(item.getAttribute('src'));
+    // });
+    // const bank = imagesElement.querySelector('.mentions');
+    // const bankURL = bank.querySelector('a').getAttribute('href');
+    // const images = {
+    //   url: imageUrl,
+    //   bank: {
+    //     name: bank.textContent,
+    //     bankURL: bankURL,
+    //   },
+    // };
 
-    const tableElement = document.querySelectorAll(
-      '#fiche_caracteristiques table tbody tr th'
-    );
-    const keyFeatures = [];
-    tableElement.forEach((tr) => keyFeatures.push({ tittle: tr.textContent }));
-    const tdElement = document.querySelectorAll(
-      '#fiche_caracteristiques table tbody tr td'
-    );
+    // const tableElement = document.querySelectorAll(
+    //   '#fiche_caracteristiques table tbody tr th'
+    // );
+    // const keyFeatures = [];
+    // tableElement.forEach((tr) => keyFeatures.push({ tittle: tr.textContent }));
+    // const tdElement = document.querySelectorAll(
+    //   '#fiche_caracteristiques table tbody tr td'
+    // );
 
-    const valueFeatures = [];
-    tdElement.forEach((td) => {
-      const value = td.querySelector('img');
-      const objs = {
-        name: td.textContent,
-        imgUrl: value?.getAttribute('src'),
-      };
-      valueFeatures.push(objs);
-    });
-    valueFeatures.forEach((obj, index) => {
-      const obj1 = keyFeatures[index];
-      Object.assign(obj1, obj);
-    });
+    // const valueFeatures = [];
+    // tdElement.forEach((td) => {
+    //   const value = td.querySelector('img');
+    //   const objs = {
+    //     name: td.textContent,
+    //     imgUrl: value?.getAttribute('src'),
+    //   };
+    //   valueFeatures.push(objs);
+    // });
+    // valueFeatures.forEach((obj, index) => {
+    //   const obj1 = keyFeatures[index];
+    //   Object.assign(obj1, obj);
+    // });
 
-    // const descriptionsElement = document.querySelector('#fiche_descriptions');
-    // const descTitle = descriptionsElement.querySelectorAll('h3');
-    // descTitle.forEach((desc) => console.log(desc.textContent));
-    // console.log(descTitle.textContent);
-
-    const result = {
-      tittle,
-      images,
-      features: keyFeatures,
-    };
-    res.json({ data: result });
+    // const result = {
+    //   tittle,
+    //   images,
+    //   features: keyFeatures,
+    // };
+    // res.json({ data: result });
   } catch (error) {
     console.log(error);
   }
+});
+
+router.get('/vn', async function (req, res, next) {
+  try {
+    const url = 'https://en.numista.com/catalogue/pieces116011.html';
+    const crawlCoinDetail = await CoinDetailService.crawlCoinDetail(url);
+    res.send(crawlCoinDetail);
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+router.get('/all', async function (req, res, next) {
+  const url = CoinDetailService.readJsonFile('coins.json');
+  const response = [];
+  for (let i = 0; i < url.length; i++) {
+    const crawlCoinDetail = await CoinDetailService.crawlCoinDetail(
+      url[i].detail
+    );
+    response.push(crawlCoinDetail);
+  }
+  console.log(response.length);
+  res.json(response.filter((item) => item !== undefined));
 });
 
 router.get('/list', async function (req, res, next) {
@@ -154,7 +176,8 @@ router.get('/list', async function (req, res, next) {
     });
 
     console.log(coinList.length);
-    const data = JSON.stringify(coinList);
+    const listCoin = coinList.splice(0, 10);
+    const data = JSON.stringify(listCoin);
     fs.writeFileSync('coins.json', data, (err) => {
       if (err) throw err;
       console.log('Data written to file');
